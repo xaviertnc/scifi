@@ -1,0 +1,40 @@
+/* My Styles */
+
+body {
+  padding: 2em;
+  font-size: 10px;
+}
+
+h1 {
+  margin: 0;
+}
+
+#view {
+  border: 1px solid blue;
+  height: 80vh;
+  position: relative;
+}
+
+#debug-view {
+  border: 1px solid brown;
+  position: absolute;
+  width: 20vw;
+  min-height: 20vh;
+  top:12px;
+  right:15px;
+  padding: 0.3em;
+}
+
+#buttons-bar {
+  float: right;
+}
+
+#buttons-bar button {
+  margin: 0.5em 0 0 0.5em;
+}
+
+.particle {
+  /*border: 1px solid red;*/
+  position: absolute;
+  border-radius: 50%;
+}
