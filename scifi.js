@@ -109,24 +109,38 @@ class Particle {
 
   constructor(id, parent, ux, uy, r)
   {
-    this.id = id
-    this.parent = parent
+    this.id = id;
+    this.state = 'Normal';
+    this.parent = parent;
     this.ux = ux;
     this.uy = uy;
-    this.rc = r;
-    this.rf = r * 1.3;
+    this.rc = r;        // core radius
+    this.rf = r * 1.3;  // influence radius 
     this.subParticles = [];
     this.elm = document.createElement('div');
     this.elm.className = 'particle';
-    this.speed = 1 + Math.random()*50;
+    this.speed = 1 + Math.random()*sciFi.universe.MAX_PARTICLE_SPEED;
     this.dir = Math.random()*Math.PI*2;
     this.width = r;
     this.height = r;
     this.visible = true;
+    let bgShade = Math.floor(Math.random()*192);
     this.bgColor = 'background-color:rgb('
-      + Math.floor(Math.random()*255) + ','
-      + Math.floor(Math.random()*255) + ','
-      + Math.floor(Math.random()*255) + ');';
+      + bgShade + ','
+      + bgShade + ','
+      + bgShade + ');';
+  }
+
+  detectCollision(otherParticles) {
+    //console.log('Particle::detectCollision...');
+    let thisParticle = this;
+    otherParticles.forEach(function(otherParticle) {
+      if (otherParticle !== thisParticle) {
+        if (Lib.distance(thisParticle.ux, thisParticle.uy, otherParticle.ux, otherParticle.uy) < thisParticle.rf) {
+          thisParticle.state = 'Hit';
+        }
+      }
+    });
   }
 
   update(now) {
@@ -142,7 +156,15 @@ class Particle {
   }
 
   draw(viewX, viewY) {
-    let style = this.bgColor+'width:' + this.width + 'px;height:' + this.height + 'px;'
+    let thisParticle = this;
+    let bgColor = thisParticle.bgColor;
+    if (thisParticle.state === 'Hit') {
+      bgColor = 'background-color:red;';
+      //setTimeout(function() {
+        thisParticle.state = 'Normal';
+      //}, 300);
+    }
+    let style = bgColor+'width:' + this.width + 'px;height:' + this.height + 'px;'
       + 'left:' + viewX + 'px;top:' + viewY + 'px;' + (this.visible ? '' : 'display:none;');
     this.elm.style = style;
     //this.elm.innerText = 'id:' + this.id + ', ' + (viewX|0) + ', y:' + (viewY|0);
@@ -176,7 +198,8 @@ class Universe {
   }
 
   createParticle() {
-    let particle = new Particle(this.nextId++, this, Math.random()*this.width, Math.random()*this.height, 1+Math.random()*100);
+    let radius = sciFi.universe.BASE_PARTICLE_RADIUS; // 1+Math.random()*100
+    let particle = new Particle(this.nextId++, this, Math.random()*this.width, Math.random()*this.height, radius);
     this.particles.push(particle);
     this.view.add(particle);
   }
@@ -206,6 +229,7 @@ class Universe {
   step(now) {
     this.ticks++;
     this.update(now);
+    this.detectCollisions(now);
     this.draw(now);
     if (this.state === 'Running') {
       this.stepTimer = window.requestAnimationFrame(this.step.bind(this));
@@ -213,7 +237,7 @@ class Universe {
   }
 
   update(now) {
-    //console.log('Update...');
+    //console.log('Universe::update');
     this.particles.forEach(function(particle) {
       particle.update(now);
     });
@@ -221,8 +245,16 @@ class Universe {
     this.debugView.update();
   }
 
+  detectCollisions(now) {
+    //console.log('Universe::detectCollisions');
+    let allParticles = this.particles;
+    this.particles.forEach(function(particle) {
+      particle.detectCollision(allParticles);
+    });
+  }
+
   draw(now) {
-    //console.log('Draw...');
+    //console.log('Universe::draw');
     let view = this.view;
     this.particles.forEach(function(particle) {
       if (view.isVisible(particle)) {
@@ -253,3 +285,6 @@ window.sciFi = {};
 sciFi.universe = new Universe(2000, 1000);
 sciFi.universe.debugView = new DebugView('debug-view');
 sciFi.universe.debugView.addMessage('ticksCount', 'Ticks: 0');
+
+sciFi.universe.MAX_PARTICLE_SPEED = 1;
+sciFi.universe.BASE_PARTICLE_RADIUS = 12;
