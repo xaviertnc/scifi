@@ -107,40 +107,117 @@ class DebugView extends View {
 
 class Particle {
 
-  constructor(id, parent, ux, uy, r)
+  constructor(id, parent, ux, uy, mass, r, speed, dir)
   {
     this.id = id;
     this.state = 'Normal';
     this.parent = parent;
     this.ux = ux;
     this.uy = uy;
-    this.rc = r;        // core radius
-    this.rf = r * 1.3;  // influence radius 
+    this.r = r;         // core radius
+    this.rm = r/2;      // merge radius
+    this.rf = r * 1.3;  // influence radius
+    this.mass = mass || 1;
+    this.density = 1;
+    this.restitution = 1;
     this.subParticles = [];
     this.elm = document.createElement('div');
     this.elm.className = 'particle';
-    this.speed = 1 + Math.random()*sciFi.universe.MAX_PARTICLE_SPEED;
-    this.dir = Math.random()*Math.PI*2;
-    this.width = r;
-    this.height = r;
+    this.speed = speed || Math.random()*sciFi.universe.MAX_PARTICLE_SPEED;
+    this.dir = dir || Math.random()*Math.PI*2;
+    this.width = r*2;
+    this.height = r*2;
     this.visible = true;
     let bgShade = Math.floor(Math.random()*192);
-    this.bgColor = 'background-color:rgb('
-      + bgShade + ','
-      + bgShade + ','
-      + bgShade + ');';
+    this.bgColor = 'border-color:#222;'; // rgb('
+//       + bgShade + ','
+//       + bgShade + ','
+//       + bgShade + ');';
   }
 
   detectCollision(otherParticles) {
     //console.log('Particle::detectCollision...');
     let thisParticle = this;
-    otherParticles.forEach(function(otherParticle) {
-      if (otherParticle !== thisParticle) {
-        if (Lib.distance(thisParticle.ux, thisParticle.uy, otherParticle.ux, otherParticle.uy) < thisParticle.rf) {
-          thisParticle.state = 'Hit';
+    let otherParticle = undefined;
+    let r1 = thisParticle.r
+    let r2 = 0
+
+    if (thisParticle.state === 'Hit' || thisParticle.state === 'Destroy') {
+      return;
+    }
+
+    let mergeIntoNewParticle = false;
+
+    for (let i=0, n=otherParticles.length; i < n; i++) {
+
+      otherParticle = otherParticles[i];
+      r2 = otherParticle.r
+
+
+      if (otherParticle.state === 'Hit' || otherParticle.state === 'Destroy') {
+        continue;
+      }
+
+      if (otherParticle.id !== thisParticle.id) {
+
+        let d = Lib.distance(thisParticle.ux, thisParticle.uy, otherParticle.ux, otherParticle.uy);
+
+        if (d < (r1 + r2)) { // r = particle radius
+
+          //console.log('d:', d, ', r1:', r1, ', r2:', r2); //, ', p1:', thisParticle, ', p2:', otherParticle);
+
+          if (d < (thisParticle.rm + otherParticle.rm)) { // rm = merge radius
+
+            mergeIntoNewParticle = true;
+
+          } else {
+
+            otherParticle.state = 'Hit';
+            thisParticle.state = 'Hit';
+
+          }
+
+          break; // If Hit or Merge, stop scanning the rest.
         }
       }
-    });
+    }
+
+    if (mergeIntoNewParticle) {
+
+      //console.log('Merging p1.id:', thisParticle.id, thisParticle.state, ' and p2.id:', otherParticle.id, otherParticle.state);
+      let spx1 = thisParticle.speed  * Math.cos(thisParticle.dir);
+      let spy1 = thisParticle.speed  * Math.sin(thisParticle.dir);
+      let spx2 = otherParticle.speed * Math.cos(otherParticle.dir);
+      let spy2 = otherParticle.speed * Math.sin(otherParticle.dir);
+      let m1 = thisParticle.r;  // we declare mass == radius
+      let m2 = otherParticle.r;
+      let combinedMass = m1 + m2;
+      let nspx = (spx1*m1 + spx2*m2)/combinedMass;
+      let nspy = (spy1*m1 + spy2*m2)/combinedMass;
+      let newDir = Math.atan2(nspy, nspx); // newDir in radians
+      if (newDir < 0) { newDir += 2*Math.PI; }
+      let newSpeed = Math.sqrt(nspx*nspx + nspy*nspy);
+
+      let newParticle = new Particle(
+        sciFi.universe.nextId++,
+        sciFi.universe,
+        (m1 > m2 ? thisParticle.ux : otherParticle.ux),
+        (m1 > m2 ? thisParticle.uy : otherParticle.uy),
+        combinedMass,
+        combinedMass, // combinedMass == combinedRadius
+        newSpeed,
+        newDir
+      );
+
+      otherParticles.push(newParticle);
+
+      sciFi.universe.view.add(newParticle);
+
+      otherParticle.state = 'Destroy';
+      thisParticle.state = 'Destroy';
+
+    }
+
   }
 
   update(now) {
@@ -159,15 +236,12 @@ class Particle {
     let thisParticle = this;
     let bgColor = thisParticle.bgColor;
     if (thisParticle.state === 'Hit') {
-      bgColor = 'background-color:red;';
-      //setTimeout(function() {
-        thisParticle.state = 'Normal';
-      //}, 300);
+      bgColor = 'border-color:red;';
+      thisParticle.state = 'Normal';
     }
     let style = bgColor+'width:' + this.width + 'px;height:' + this.height + 'px;'
-      + 'left:' + viewX + 'px;top:' + viewY + 'px;' + (this.visible ? '' : 'display:none;');
+      + 'left:' + (viewX-thisParticle.r)   + 'px;top:' + (viewY-thisParticle.r) + 'px;' + (this.visible ? '' : 'display:none;');
     this.elm.style = style;
-    //this.elm.innerText = 'id:' + this.id + ', ' + (viewX|0) + ', y:' + (viewY|0);
   }
 
   destroy() {
@@ -199,7 +273,8 @@ class Universe {
 
   createParticle() {
     let radius = sciFi.universe.BASE_PARTICLE_RADIUS; // 1+Math.random()*100
-    let particle = new Particle(this.nextId++, this, Math.random()*this.width, Math.random()*this.height, radius);
+    let mass = sciFi.universe.BASE_PARTICLE_MASS;
+    let particle = new Particle(this.nextId++, this, Math.random()*this.width, Math.random()*this.height, mass, radius);
     this.particles.push(particle);
     this.view.add(particle);
   }
@@ -211,7 +286,7 @@ class Universe {
     this.ticks = 0;
     this.view.clear();
     this.particles = [];
-    for (let i=0, n=Math.floor(1+Math.random()*500); i < n; i++) {
+    for (let i=0, n=Math.floor(1+Math.random()*sciFi.universe.MAX_PARTICLES); i < n; i++) {
       this.createParticle();
     }
     this.state = 'Running';
@@ -231,6 +306,7 @@ class Universe {
     this.update(now);
     this.detectCollisions(now);
     this.draw(now);
+    this.afterDraw(now)
     if (this.state === 'Running') {
       this.stepTimer = window.requestAnimationFrame(this.step.bind(this));
     }
@@ -272,6 +348,25 @@ class Universe {
     this.debugView.draw();
   }
 
+  afterDraw(now) {
+    //console.log('Universe::afterDraw');
+    let allParticles = this.particles;
+
+    //this.particles.forEach(function(particle) {
+    //  particle.afterDraw(now);
+    //});
+
+    // Remove destroyed particles
+    this.particles = allParticles.filter(function(particle) {
+      if (particle.state === 'Destroy') {
+        particle.elm.remove();
+        return false;
+      } else {
+        return true;
+      }
+    });
+  }
+
   destroyChild(child) {
     child.elm.remove();
     this.particles = Lib.removeItem(this.particles, child);
@@ -282,9 +377,11 @@ class Universe {
 
 window.sciFi = {};
 
-sciFi.universe = new Universe(2000, 1000);
+sciFi.universe = new Universe(600, 500);
 sciFi.universe.debugView = new DebugView('debug-view');
 sciFi.universe.debugView.addMessage('ticksCount', 'Ticks: 0');
 
-sciFi.universe.MAX_PARTICLE_SPEED = 1;
-sciFi.universe.BASE_PARTICLE_RADIUS = 12;
+sciFi.universe.MAX_PARTICLES = 1000;
+sciFi.universe.MAX_PARTICLE_SPEED = 10;
+sciFi.universe.BASE_PARTICLE_RADIUS = 5;
+sciFi.universe.BASE_PARTICLE_MASS = sciFi.universe.BASE_PARTICLE_RADIUS;

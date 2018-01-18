@@ -28,4 +28,6 @@ long_line_behaviour=1
 long_line_column=0
 
 [files]
-current_page=0
+current_page=1
+FILE_NAME_0=1601;Javascript;0;EUTF-8;0;1;0;%2Fvar%2Fwww%2Fhtml%2Fscifi%2Flib.js;0;2
+FILE_NAME_1=3539;Javascript;0;EUTF-8;0;1;0;%2Fvar%2Fwww%2Fhtml%2Fscifi%2Fscifi.js;0;2
