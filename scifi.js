@@ -1,10 +1,50 @@
+class Vector2D {
+
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
+  }
+
+  length() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+
+  magnitude() {
+    return this.length();
+  }
+
+  normalize() {
+    var s = 1 / this.length();
+    this.x *= s;
+    this.y *= s;
+    return this;
+  }
+
+  multiply(s) {
+    return new Vector2D(this.x * s, this.y * s);
+  }
+
+  tx(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+
+}
+
+
+
 class View {
 
   constructor(id)
   {
     this.id = id
     this.elm = document.getElementById(id);
-    this.ux = 0;
+    this.pos = new Vector2D;
     this.uy = 0;
     this.width = 0;
     this.height = 0;
@@ -12,8 +52,8 @@ class View {
 
   isVisible(sprObj) {
     return ! Lib.outOfBounds(
-      { x: this.ux, y: this.uy, width: this.getWidth(), height: this.getHeight()},
-      { x: sprObj.ux, y: sprObj.uy, width: sprObj.width, height: sprObj.height }
+      {x: this.ux, y: this.uy, width: this.getWidth(), height: this.getHeight()},
+      {x: sprObj.pos.x, y: sprObj.pos.y, width: sprObj.width, height: sprObj.height}
     );
   }
 
@@ -36,14 +76,15 @@ class View {
   }
 
   getXOnView(spriteObj) {
-    return spriteObj.ux - this.ux;
+    return spriteObj.pos.x - this.ux;
   }
 
   getYOnView(spriteObj) {
-    return spriteObj.uy - this.uy;
+    return spriteObj.pos.y - this.uy;
   }
 
 }
+
 
 
 class Text {
@@ -69,6 +110,7 @@ class Text {
   }
 
 }
+
 
 
 class DebugView extends View {
@@ -105,142 +147,172 @@ class DebugView extends View {
 }
 
 
+
 class Particle {
 
-  constructor(id, parent, ux, uy, mass, r, speed, dir)
-  {
+  constructor(id, parent, elasticity, ux, uy, angle, speed, radius, mass) {
     this.id = id;
-    this.state = 'Normal';
     this.parent = parent;
-    this.ux = ux;
-    this.uy = uy;
-    this.r = r;         // core radius
-    this.rm = r/2;      // merge radius
-    this.rf = r * 1.3;  // influence radius
-    this.mass = mass || 1;
-    this.density = 1;
-    this.restitution = 1;
-    this.subParticles = [];
+    this.bgColor = 'border-color:#222;';
     this.elm = document.createElement('div');
     this.elm.className = 'particle';
-    this.speed = speed || Math.random()*sciFi.universe.MAX_PARTICLE_SPEED;
-    this.dir = dir || Math.random()*Math.PI*2;
-    this.width = r*2;
-    this.height = r*2;
+    this.angle = angle || 0;
+    this.speed = speed || 1;
+    this.velocity = new Vector2D(this.speed * Math.cos(this.angle), this.speed * Math.sin(this.angle));
+    this.pos = new Vector2D(ux, uy); // position
+    this.radius = radius || 1;
+    this.mergeRadius = this.radius / 2;
+    this.influenceRadius = this.radius * 1.3;
+    this.mass = mass || this.radius;
+    this.height = this.radius * 2;
+    this.width = this.radius * 2;
+    this.subParticles = [];
+    this.cr = elasticity;
+    this.state = 'Normal';
     this.visible = true;
-    let bgShade = Math.floor(Math.random()*192);
-    this.bgColor = 'border-color:#222;'; // rgb('
-//       + bgShade + ','
-//       + bgShade + ','
-//       + bgShade + ');';
   }
 
+
   detectCollision(otherParticles) {
+
     //console.log('Particle::detectCollision...');
+
     let thisParticle = this;
     let otherParticle = undefined;
-    let r1 = thisParticle.r
-    let r2 = 0
+    let thisRadius = thisParticle.radius
+    let otherRadius = 0
 
-    if (thisParticle.state === 'Hit' || thisParticle.state === 'Destroy') {
-      return;
-    }
+    if (thisParticle.state === 'Hit' || thisParticle.state === 'Destroy') { return; }
 
     let mergeIntoNewParticle = false;
+    let collideParticles = false;
 
     for (let i=0, n=otherParticles.length; i < n; i++) {
 
       otherParticle = otherParticles[i];
-      r2 = otherParticle.r
 
-
-      if (otherParticle.state === 'Hit' || otherParticle.state === 'Destroy') {
-        continue;
-      }
+      if (otherParticle.state === 'Hit' || otherParticle.state === 'Destroy') { continue; }
 
       if (otherParticle.id !== thisParticle.id) {
 
-        let d = Lib.distance(thisParticle.ux, thisParticle.uy, otherParticle.ux, otherParticle.uy);
+        let seperation = Lib.distance(thisParticle.pos.x, thisParticle.pos.y, otherParticle.pos.x, otherParticle.pos.y);
 
-        if (d < (r1 + r2)) { // r = particle radius
+        if (seperation < thisRadius + otherParticle.radius) {
 
-          //console.log('d:', d, ', r1:', r1, ', r2:', r2); //, ', p1:', thisParticle, ', p2:', otherParticle);
+          if (seperation < thisParticle.mergeRadius + otherParticle.mergeRadius && Math.random() > 0.95) {
 
-          if (d < (thisParticle.rm + otherParticle.rm)) { // rm = merge radius
-
+            otherParticle.state = 'Destroy';
+            thisParticle.state = 'Destroy';
             mergeIntoNewParticle = true;
-
-          } else {
-
-            otherParticle.state = 'Hit';
-            thisParticle.state = 'Hit';
-
+            break;
           }
 
-          break; // If Hit or Merge, stop scanning the rest.
+          otherParticle.state = 'Hit';
+          thisParticle.state = 'Hit';
+          collideParticles = true;
+          break;
         }
       }
     }
 
     if (mergeIntoNewParticle) {
 
-      //console.log('Merging p1.id:', thisParticle.id, thisParticle.state, ' and p2.id:', otherParticle.id, otherParticle.state);
-      let spx1 = thisParticle.speed  * Math.cos(thisParticle.dir);
-      let spy1 = thisParticle.speed  * Math.sin(thisParticle.dir);
-      let spx2 = otherParticle.speed * Math.cos(otherParticle.dir);
-      let spy2 = otherParticle.speed * Math.sin(otherParticle.dir);
-      let m1 = thisParticle.r;  // we declare mass == radius
-      let m2 = otherParticle.r;
-      let combinedMass = m1 + m2;
-      let nspx = (spx1*m1 + spx2*m2)/combinedMass;
-      let nspy = (spy1*m1 + spy2*m2)/combinedMass;
-      let newDir = Math.atan2(nspy, nspx); // newDir in radians
-      if (newDir < 0) { newDir += 2*Math.PI; }
-      let newSpeed = Math.sqrt(nspx*nspx + nspy*nspy);
+      let m1 = thisParticle.mass;
+      let m2 = otherParticle.mass;
+      let v1 = thisParticle.velocity;
+      let v2 = otherParticle.velocity;
+      let newRadius = thisParticle.radius + otherParticle.radius
+      let newMass = m1 + m2;
+      let newVelocity = new Vector2D((v1.x*m1 + v2.x*m2) / newMass, (v1.y*m1 + v2.y*m2) / newMass);
+      let newAngle = Math.atan2(newVelocity.y, newVelocity.x); // newAngle in +-PI radians
+      if (newAngle < 0) { newAngle += 2*Math.PI; }
+      let newSpeed = newVelocity.magnitude();
 
       let newParticle = new Particle(
         sciFi.universe.nextId++,
         sciFi.universe,
-        (m1 > m2 ? thisParticle.ux : otherParticle.ux),
-        (m1 > m2 ? thisParticle.uy : otherParticle.uy),
-        combinedMass,
-        combinedMass, // combinedMass == combinedRadius
+        1,
+        (m1 > m2 ? thisParticle.pos.x : otherParticle.pos.x),
+        (m1 > m2 ? thisParticle.pos.y : otherParticle.pos.y),
+        newAngle,
         newSpeed,
-        newDir
+        newRadius,
+        newMass
       );
 
       otherParticles.push(newParticle);
-
       sciFi.universe.view.add(newParticle);
 
-      otherParticle.state = 'Destroy';
-      thisParticle.state = 'Destroy';
+    } else if (collideParticles) {
+
+      let dt, mT, v1, v2, cr, combinedMass,
+          dn = new Vector2D(thisParticle.pos.x - otherParticle.pos.x, thisParticle.pos.y - otherParticle.pos.y),
+          sr = thisParticle.radius + otherParticle.radius, // sum of radii
+          dx = dn.magnitude(); // pre-normalized magnitude
+
+      if (dx > sr) { return; } // no collision
+
+      // sum the masses, normalize the collision vector and get its tangential
+      combinedMass = thisParticle.mass + otherParticle.mass;
+      dn.normalize();
+      dt = new Vector2D(dn.y, -dn.x);
+
+      // avoid double collisions by "un-deforming" balls (larger mass == less tx)
+      // this is susceptible to rounding errors, "jiggle" behavior and anti-gravity
+      // suspension of the object get into a strange state
+      mT = dn.multiply(thisParticle.radius + otherParticle.radius - dx);
+      thisParticle.pos.tx(mT.multiply(otherParticle.mass / combinedMass));
+      otherParticle.pos.tx(mT.multiply(-thisParticle.mass / combinedMass));
+
+      // this interaction is strange, as the CR describes more than just
+      // the ball's bounce properties, it describes the level of conservation
+      // observed in a collision and to be "true" needs to describe, rigidity,
+      // elasticity, level of energy lost to deformation or adhesion, and crazy
+      // values (such as cr > 1 or cr < 0) for stange edge cases obviously not
+      // handled here (see: http://en.wikipedia.org/wiki/Coefficient_of_restitution)
+      // for now assume the ball with the least amount of elasticity describes the
+      // collision as a whole:
+      cr = Math.min(thisParticle.cr, otherParticle.cr);
+
+      // cache the magnitude of the applicable component of the relevant velocity
+      v1 = dn.multiply(thisParticle.velocity.dot(dn)).magnitude();
+      v2 = dn.multiply(otherParticle.velocity.dot(dn)).magnitude();
+
+      // maintain the unapplicatble component of the relevant velocity
+      // then apply the formula for inelastic collisions
+      thisParticle.velocity = dt.multiply(thisParticle.velocity.dot(dt));
+      thisParticle.velocity.tx(dn.multiply((cr * otherParticle.mass * (v2 - v1) + thisParticle.mass * v1 + otherParticle.mass * v2) / combinedMass));
+
+      // do this once for each object, since we are assuming collide will be called
+      // only once per "frame" and its also more effiecient for calculation cacheing
+      // purposes
+      otherParticle.velocity = dt.multiply(otherParticle.velocity.dot(dt));
+      otherParticle.velocity.tx(dn.multiply((cr * thisParticle.mass * (v1 - v2) + otherParticle.mass * v2 + thisParticle.mass * v1) / combinedMass));
 
     }
 
   }
 
   update(now) {
-    let dx = this.speed * Math.cos(this.dir);
-    let dy = this.speed * Math.sin(this.dir);
-    let u = sciFi.universe;
-    this.ux += dx;
-    this.uy += dy;
-    if (this.ux >= u.width) { this.ux = this.ux - u.width; }
-    if (this.ux < 0) { this.ux = u.width + this.ux; }
-    if (this.uy >= u.height) { this.uy = this.uy - u.height; }
-    if (this.uy < 0) { this.uy = u.height + this.uy; }
+    this.pos.tx(this.velocity);
+    let universe = sciFi.universe;
+    if (this.pos.x >= universe.width) { this.pos.x = this.pos.x - universe.width; }
+    if (this.pos.x < 0) { this.pos.x = universe.width + this.pos.x; }
+    if (this.pos.y >= universe.height) { this.pos.y = this.pos.y - universe.height; }
+    if (this.pos.y < 0) { this.pos.y = universe.height + this.pos.y; }
   }
 
   draw(viewX, viewY) {
     let thisParticle = this;
+    let radius = thisParticle.radius;
     let bgColor = thisParticle.bgColor;
     if (thisParticle.state === 'Hit') {
       bgColor = 'border-color:red;';
       thisParticle.state = 'Normal';
     }
-    let style = bgColor+'width:' + this.width + 'px;height:' + this.height + 'px;'
-      + 'left:' + (viewX-thisParticle.r)   + 'px;top:' + (viewY-thisParticle.r) + 'px;' + (this.visible ? '' : 'display:none;');
+    let style = bgColor+'width:' + this.width + 'px;height:' + this.height + 'px;' +
+      'left:' + (viewX-radius) + 'px;top:' + (viewY-radius) + 'px;' +
+        (this.visible ? '' : 'display:none;');
     this.elm.style = style;
   }
 
@@ -267,14 +339,26 @@ class Universe {
     this.stepTimer = undefined;
     this.particles = [];
     this.state = 'Idle';
-    this.ticks = 0;
     this.nextId = 0;
+    this.ticks = 0;
   }
 
   createParticle() {
+    let angle = Math.random()*Math.PI*2;
+    let speed = Math.random() * sciFi.universe.MAX_PARTICLE_SPEED;
     let radius = sciFi.universe.BASE_PARTICLE_RADIUS; // 1+Math.random()*100
     let mass = sciFi.universe.BASE_PARTICLE_MASS;
-    let particle = new Particle(this.nextId++, this, Math.random()*this.width, Math.random()*this.height, mass, radius);
+    let particle = new Particle(
+      this.nextId++,
+      this,
+      1,
+      Math.random() * this.width,
+      Math.random() * this.height,
+      angle,
+      speed,
+      radius,
+      mass
+    );
     this.particles.push(particle);
     this.view.add(particle);
   }
@@ -286,7 +370,7 @@ class Universe {
     this.ticks = 0;
     this.view.clear();
     this.particles = [];
-    for (let i=0, n=Math.floor(1+Math.random()*sciFi.universe.MAX_PARTICLES); i < n; i++) {
+    for (let i=0, n=Math.floor(1000 + Math.random() * sciFi.universe.MAX_PARTICLES); i < n; i++) {
       this.createParticle();
     }
     this.state = 'Running';
@@ -377,11 +461,11 @@ class Universe {
 
 window.sciFi = {};
 
-sciFi.universe = new Universe(600, 500);
+sciFi.universe = new Universe(800, 600);
 sciFi.universe.debugView = new DebugView('debug-view');
 sciFi.universe.debugView.addMessage('ticksCount', 'Ticks: 0');
 
 sciFi.universe.MAX_PARTICLES = 1000;
-sciFi.universe.MAX_PARTICLE_SPEED = 10;
-sciFi.universe.BASE_PARTICLE_RADIUS = 5;
+sciFi.universe.MAX_PARTICLE_SPEED = 100;
+sciFi.universe.BASE_PARTICLE_RADIUS = 3;
 sciFi.universe.BASE_PARTICLE_MASS = sciFi.universe.BASE_PARTICLE_RADIUS;
