@@ -11,8 +11,8 @@ h1 {
 
 #view {
   border: 1px solid blue;
-  height: 480px;
-  width: 640px;
+  height: 200px;
+  width: 320px;
   position: relative;
 }
 

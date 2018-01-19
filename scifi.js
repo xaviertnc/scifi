@@ -361,7 +361,7 @@ class Universe {
   }
 
   getMaxParticles() {
-    return 100 + Math.floor(Math.random()*300);
+    return 100 + Math.floor(Math.random() * (this.MAX_PARTICLES - 100));
   }
 
   createParticle() {
@@ -480,12 +480,17 @@ class Universe {
 
 window.sciFi = {};
 
-sciFi.universe = new Universe(800, 600);
+//sciFi.universe = new Universe(800, 600);
+//sciFi.universe = new Universe(640, 480);
+sciFi.universe = new Universe(320, 200);
 
 sciFi.universe.BASE_PARTICLE_ELASTICITY = 1;
-sciFi.universe.MAX_PARTICLE_SPEED = 100;
-sciFi.universe.BASE_PARTICLE_RADIUS = 2;
-sciFi.universe.BASE_PARTICLE_MASS = 2;
+sciFi.universe.BASE_PARTICLE_RADIUS = 1;
+sciFi.universe.BASE_PARTICLE_MASS = 1;
+
+sciFi.universe.MAX_PARTICLE_SPEED = 1;
+
+sciFi.universe.MAX_PARTICLES = 3000;
 
 sciFi.universe.debugView = new DebugView('debug-view');
 sciFi.universe.debugView.addMessage('ticksCount', 'Ticks: 0');
