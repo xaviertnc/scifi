@@ -89,6 +89,69 @@ window.Lib = {
   },
 
 
+  collideParticles: function(thisParticle, otherParticle, collisionVector, sumOfRadii, sumOfMass, seperation) {
+
+      // normalize the collision vector
+      collisionVector.normalize();
+
+      // avoid double collisions by "un-deforming" balls (larger mass == less tx)
+      // this is susceptible to rounding errors, "jiggle" behavior and anti-gravity
+      // suspension of the object get into a strange state
+      let overlap = sumOfRadii - seperation;
+      let mTranslateOutOfOverlap = collisionVector.multiply(overlap);
+
+      //if (thisParticle.radius > otherParticle.radius) {
+      //  otherParticle.pos.tx(mTranslateOutOfOverlap.multiply(-1));
+      //} else {
+      //  thisParticle.pos.tx(mTranslateOutOfOverlap);
+      //}
+
+      thisParticle.pos.tx(mTranslateOutOfOverlap.multiply(otherParticle.mass / sumOfMass));
+      otherParticle.pos.tx(mTranslateOutOfOverlap.multiply(-thisParticle.mass / sumOfMass));
+
+      //if (thisParticle.id !== 'mother') { thisParticle.pos.tx(mTranslateOutOfOverlap); }
+      //if (otherParticle.id !== 'mother') { otherParticle.pos.tx(mTranslateOutOfOverlap.multiply(-1)); }
+
+      // cr: Coefficient_of_restitution or Coefficient_or_elasticity
+      // this interaction is strange, as the CR describes more than just
+      // the ball's bounce properties, it describes the level of conservation
+      // observed in a collision and to be "true" needs to describe, rigidity,
+      // elasticity, level of energy lost to deformation or adhesion, and crazy
+      // values (such as cr > 1 or cr < 0) for stange edge cases obviously not
+      // handled here (see: http://en.wikipedia.org/wiki/Coefficient_of_restitution)
+      // for now assume the ball with the least amount of elasticity describes the
+      // collision as a whole:
+      let cr = Math.min(thisParticle.cr, otherParticle.cr);
+
+      // cache the magnitude of the applicable component of the relevant velocity
+      let v1 = collisionVector.multiply(thisParticle.velocity.dot(collisionVector)).magnitude();
+      let v2 = collisionVector.multiply(otherParticle.velocity.dot(collisionVector)).magnitude();
+
+      // get the collision vector tangential
+      let collisionTangent = new Vector2D(collisionVector.y, -collisionVector.x);
+
+      // maintain the unapplicatble component of the relevant velocity
+      // then apply the formula for inelastic collisions
+      thisParticle.velocity = collisionTangent.multiply(thisParticle.velocity.dot(collisionTangent));
+      thisParticle.velocity.tx(
+        collisionVector.multiply(
+          (cr * otherParticle.mass * (v2 - v1) + thisParticle.mass * v1 + otherParticle.mass * v2) / sumOfMass
+        )
+      );
+
+      // do this once for each object, since we are assuming collide will be called
+      // only once per "frame" and its also more effiecient for calculation cacheing
+      // purposes
+      otherParticle.velocity = collisionTangent.multiply(otherParticle.velocity.dot(collisionTangent));
+      otherParticle.velocity.tx(
+        collisionVector.multiply(
+          (cr * thisParticle.mass * (v1 - v2) + otherParticle.mass * v2 + thisParticle.mass * v1) / sumOfMass
+        )
+      );
+
+  },
+
+
   rateLimit: function(func, wait, immediate) {
 
       var delayTimer;
