@@ -594,7 +594,7 @@ sciFi.universe.BASE_PARTICLE_RADIUS = 0.5;
 sciFi.universe.BASE_PARTICLE_MASS = 0.5;
 
 sciFi.universe.MAX_PARTICLE_SPEED = 10;
-sciFi.universe.MAX_PARTICLE_RADIUS = 27;
+sciFi.universe.MAX_PARTICLE_RADIUS = 22;
 sciFi.universe.MAX_PARTICLE_MASS = sciFi.universe.MAX_PARTICLE_RADIUS * 10;
 sciFi.universe.MAX_PARTICLES = 1000;
 sciFi.universe.MAX_BPC = 3;

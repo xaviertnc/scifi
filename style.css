@@ -10,7 +10,7 @@ h1 {
 }
 
 #view {
-/*   background-color: #000020; */
+  background-color: #000020;
   border: 1px solid blue;
   height: 700px;
   width: 800px;
@@ -36,8 +36,8 @@ h1 {
 }
 
 #mother {
-/*   background: url(img/planet-002.png) no-repeat center center; */
-/*   background-size: cover; */
+  background: url(img/earth.png) no-repeat center center;
+  background-size: cover;
 /*   border: 0; */
 }
 
@@ -48,6 +48,6 @@ h1 {
 }
 
 .big.particle {
-/*   background: url(img/planet-003.png) no-repeat center center; */
-/*   background-size: cover; */
+  background: url(img/planet-003.png) no-repeat center center;
+  background-size: cover;
 }
