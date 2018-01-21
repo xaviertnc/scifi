@@ -7,13 +7,15 @@
     <link href="style.css" rel="stylesheet" />
   </head>
   <body>
-    <h1>SciFi World</h1>
     <div id="view"></div>
     <div id="debug-view"></div>
-    <div id="buttons-bar">
-      <button type="button" id="start-button" onclick="sciFi.universe.start()">Start</button>
-      <button type="button" id="pause-button" onclick="sciFi.universe.stop('pause')" disabled>Pause</button>
-      <button type="button" id="stop-button" onclick="sciFi.universe.stop()" disabled>Stop</button>
+    <div id="bottom-bar">
+      <h1 class="pull-left">SciFi World</h1>
+      <div class="pull-right">
+        <button type="button" id="start-button" onclick="sciFi.universe.start()">Start</button>
+        <button type="button" id="pause-button" onclick="sciFi.universe.stop('pause')" disabled>Pause</button>
+        <button type="button" id="stop-button" onclick="sciFi.universe.stop()" disabled>Stop</button>
+      </div>
     </div>
   </body>
   <script src="lib.js"></script>

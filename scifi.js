@@ -17,6 +17,11 @@ class Vector2D {
     return this.length();
   }
 
+  getDistance(v) {
+    return Math.sqrt((v.x - this.x) * (v.x - this.x) + 
+      (v.y - this.y) * (v.y - this.y));
+  }
+
   normalize() {
     var s = 1 / this.length();
     this.x *= s;
@@ -26,6 +31,14 @@ class Vector2D {
 
   multiply(s) {
     return new Vector2D(this.x * s, this.y * s);
+  }
+
+  add(v) {
+    return new Vector2D(this.x + v.x, this.y + v.y);
+  }
+
+  subtract(v) {
+    return new Vector2D(this.x - v.x, this.y - v.y);
   }
 
   tx(v) {
@@ -40,14 +53,22 @@ class Vector2D {
 
 class View {
 
-  constructor(id)
+  /**
+   * View width, height, ux, uy are optional.
+   * getHeight() + getWidth() is needed to get height/width if the
+   * view style specifies the width as a percentage for example.
+   */
+  constructor(id, width, height, x, y)
   {
     this.id = id;
+    this.x = x || 0;
+    this.y = y || 0;
+    this.width = width || 0;
+    this.height = height || 0;
+    this.elm = document.getElementById(id);
+    this.visible = true;
     this.ux = 0;
     this.uy = 0;
-    this.width = 0;
-    this.height = 0;
-    this.elm = document.getElementById(id);
   }
 
   isVisible(sprObj) {
@@ -66,13 +87,11 @@ class View {
   }
 
   getWidth() {
-    this.width = this.elm.clientWidth;
-    return this.width;
+    return (this.width || this.elm.clientWidth);
   }
 
   getHeight() {
-    this.height = this.elm.clientHeight;
-    return this.height;
+    return (this.height || this.elm.clientHeight);
   }
 
   getCenterX() {
@@ -89,6 +108,13 @@ class View {
 
   getYOnView(spriteObj) {
     return spriteObj.pos.y - this.uy;
+  }
+
+  draw() {
+    let style = 'width:' + this.getWidth() + 'px;height:' + this.getHeight() + 'px;' +
+      'left:' + this.x + 'px;top:' + this.y + 'px;' +
+        (this.visible ? '' : 'display:none;');
+    this.elm.style = style;
   }
 
 }
@@ -168,7 +194,7 @@ class Particle {
     this.elm.id = id;
     this.pos = new Vector2D(x, y); // position
     this.radius = radius || 1;
-    this.mergeRadius = this.radius * 0.8;
+    this.mergeRadius = this.radius * 1;
     //this.influenceRadius = this.radius * 1.3;
     this.mass = mass || this.radius;
     if (velocity) {
@@ -193,12 +219,13 @@ class Particle {
   }
 
 
-  redeploy(universe) {
-    this.pos.x = universe.view.ux + universe.view.getWidth() * Math.random();
-    this.pos.y = 0;
+  respawn(universe) {
+    let angle = Math.random() * Math.PI * 2;
+    this.pos.x = universe.mother.pos.x + universe.mother.radius * 2 + universe.mother.radius * Math.random() * Math.cos(angle);
+    this.pos.y = universe.mother.pos.y + universe.mother.radius * 2 + universe.mother.radius * Math.random() * Math.sin(angle);
     this.radius = universe.BASE_PARTICLE_RADIUS;
-    this.mergeRadius = this.radius * 0.8;
-    //this.influenceRadius = this.radius * 1.3;
+    this.mergeRadius = this.radius;
+    this.influenceRadius = this.radius * 1.3;
     this.mass = universe.BASE_PARTICLE_MASS;
     this.height = this.radius * 2;
     this.width = this.radius * 2;
@@ -220,7 +247,7 @@ class Particle {
     let otherParticle = undefined;
     let otherRadius = undefined;
     let sumOfRadii = undefined;
-    let seperation = undefined;
+    let separation = undefined;
     let sumOfMass = undefined;
 
     for (let i=(thisParticle.isMother ? 0 : -1), n=otherParticles.length; i < n; i++) {
@@ -229,16 +256,13 @@ class Particle {
 
       if (otherParticle === thisParticle || otherParticle.state === 'Destroy') { continue; }
 
-      collisionVector = new Vector2D(
-        thisParticle.pos.x - otherParticle.pos.x,
-        thisParticle.pos.y - otherParticle.pos.y
-      );
+      collisionVector = thisParticle.pos.subtract(otherParticle.pos);
 
-      seperation = collisionVector.magnitude();
+      separation = collisionVector.magnitude();
       sumOfRadii = thisRadius + otherParticle.radius;
       sumOfMass = thisParticle.mass + otherParticle.mass;
 
-      if (seperation < sumOfRadii) { // If YES, we have a collision!
+      if (separation < sumOfRadii) { // If YES, we have a collision!
 
         let wantToMerge = false;
         let motherIsInvolved = thisParticle.isMother || otherParticle.isMother;
@@ -252,6 +276,8 @@ class Particle {
             wantToMerge = thisParticle.isBaseParticle && otherParticle.isBaseParticle; // Math.random() < 0.5 &&
 
           } else {
+
+            //console.log('Collision outside mother... thisParticle:', thisParticle, ', otherParticle:', otherParticle);
 
             //let maxRadius = Math.max(thisParticle.radius, otherParticle.radius);
             //let minRadius = Math.min(thisParticle.radius, otherParticle.radius);
@@ -297,7 +323,7 @@ class Particle {
             collisionVector,
             sumOfRadii,
             sumOfMass,
-            seperation
+            separation
           );
 
         }
@@ -315,20 +341,22 @@ class Particle {
         let v1 = thisParticle.velocity;
         let v2 = otherParticle.velocity;
 
-        let v3 = new Vector2D((v1.x*m1 + v2.x*m2) / sumOfMass, (v1.y*m1 + v2.y*m2) / sumOfMass);
+        //let v3 = new Vector2D((v1.x*m1 + v2.x*m2) / sumOfMass, (v1.y*m1 + v2.y*m2) / sumOfMass);
 
-        //console.log('v3:', v3);
+        let angle = Math.random() * Math.PI * 2;
+        let px = universe.mother.pos.x + (universe.mother.radius*1.1 + universe.mother.radius * Math.random()) * Math.cos(angle);
+        let py = universe.mother.pos.y + (universe.mother.radius*1.1 + universe.mother.radius * Math.random()) * Math.sin(angle);
 
         // *** CREATE NEW PARTICLE ***
         let newParticle = new Particle(
           universe.nextId++,
           universe,
-          0.75, //Math.min(thisParticle.cr, otherParticle.cr),
-          (m1 > m2 ? thisParticle.pos.x : otherParticle.pos.x),
-          (m1 > m2 ? thisParticle.pos.y : otherParticle.pos.y),
+          1, //Math.min(thisParticle.cr, otherParticle.cr),
+          px, //(m1 > m2 ? thisParticle.pos.x : otherParticle.pos.x),
+          py, //(m1 > m2 ? thisParticle.pos.y : otherParticle.pos.y),
           universe.MAX_PARTICLE_RADIUS,
           universe.MAX_PARTICLE_MASS,
-          v3
+          new Vector2D(Math.random(), Math.random())
         );
 
         newParticle.elm.className = 'big particle';
@@ -340,8 +368,8 @@ class Particle {
 
       }
 
-      otherParticle.redeploy(universe);
-      thisParticle.redeploy(universe);
+      otherParticle.respawn(universe);
+      thisParticle.respawn(universe);
 
     }
 
@@ -359,7 +387,7 @@ class Particle {
       this.inMother = Lib.distance(this.mother.pos.x, this.mother.pos.y, this.pos.x, this.pos.y) < this.mother.mergeRadius;
       if (this.inMother) {
         this.state = 'Destroy';
-        this.redeploy(universe);
+        this.respawn(universe);
       }
     }
   }
@@ -396,12 +424,13 @@ class Particle {
 
 class Universe {
 
-  constructor(width, height) {
+  constructor(width, height, viewW, viewH) {
     this.width = width;
     this.height = height;
-    this.view = new View('view');
-    this.view.ux = (this.width - this.view.getWidth()) / 2;
-    this.view.ux = (this.height - this.view.getHeight()) / 2;
+    this.view = new View('view', viewW, viewH);
+    this.view.ux = (this.width  - viewW) / 2;
+    this.view.uy = (this.height - viewH) / 2;
+    this.view.draw();
     this.stepTimer = undefined;
     this.particles = [];
     this.state = 'Idle';
@@ -418,12 +447,15 @@ class Universe {
 
 
   createParticle(i, p, c, x, y, r, m, v) {
+    let angle = Math.random() * Math.PI * 2;
+    let px = this.mother.pos.x + (this.mother.radius*2 + this.mother.radius * Math.random()) * Math.cos(angle);
+    let py = this.mother.pos.y + (this.mother.radius*2 + this.mother.radius * Math.random()) * Math.sin(angle);
     let particle = new Particle(
       i || this.nextId++,
       p || this,
       c || this.BASE_PARTICLE_ELASTICITY,
-      x || this.width * Math.random(),
-      y || this.height * Math.random(),
+      x || px, //this.width * Math.random(),
+      y || py, //this.height * Math.random(),
       r || this.BASE_PARTICLE_RADIUS,
       m || this.BASE_PARTICLE_MASS,
       v || undefined,
@@ -584,19 +616,19 @@ class Universe {
 
 window.sciFi = {};
 
-sciFi.universe = new Universe(1000, 1000);
+sciFi.universe = new Universe(1000, 1000, 600, 600);
 //sciFi.universe = new Universe(800, 600);
 //sciFi.universe = new Universe(640, 480);
 //sciFi.universe = new Universe(320, 200);
 
 sciFi.universe.BASE_PARTICLE_ELASTICITY = 1;
-sciFi.universe.BASE_PARTICLE_RADIUS = 0.5;
-sciFi.universe.BASE_PARTICLE_MASS = 0.5;
+sciFi.universe.BASE_PARTICLE_RADIUS = 2;
+sciFi.universe.BASE_PARTICLE_MASS = 2;
 
 sciFi.universe.MAX_PARTICLE_SPEED = 10;
 sciFi.universe.MAX_PARTICLE_RADIUS = 22;
-sciFi.universe.MAX_PARTICLE_MASS = sciFi.universe.MAX_PARTICLE_RADIUS * 10;
-sciFi.universe.MAX_PARTICLES = 1000;
+sciFi.universe.MAX_PARTICLE_MASS = sciFi.universe.MAX_PARTICLE_RADIUS * 1;
+sciFi.universe.MAX_PARTICLES = 2000;
 sciFi.universe.MAX_BPC = 3;
 
 sciFi.universe.MOTHER_ELASTICITY = 0.5;
