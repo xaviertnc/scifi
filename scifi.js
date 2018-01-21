@@ -626,10 +626,10 @@ sciFi.universe.BASE_PARTICLE_RADIUS = 2;
 sciFi.universe.BASE_PARTICLE_MASS = 2;
 
 sciFi.universe.MAX_PARTICLE_SPEED = 10;
-sciFi.universe.MAX_PARTICLE_RADIUS = 22;
+sciFi.universe.MAX_PARTICLE_RADIUS = 10;
 sciFi.universe.MAX_PARTICLE_MASS = sciFi.universe.MAX_PARTICLE_RADIUS * 1;
-sciFi.universe.MAX_PARTICLES = 2000;
-sciFi.universe.MAX_BPC = 3;
+sciFi.universe.MAX_PARTICLES = 10000;
+sciFi.universe.MAX_BPC = 10;
 
 sciFi.universe.MOTHER_ELASTICITY = 0.5;
 sciFi.universe.MOTHER_RADIUS = 220;
